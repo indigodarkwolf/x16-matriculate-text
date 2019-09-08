@@ -32,5 +32,5 @@
 	VERA_irq_ctrl	= $9f26	; unused
 	VRAM_sprdata	= $40800	; unused
 	VRAM_palette	= $40200
-	SYS_rand_mem	= $a000
-	Palette_cycle_index	= $b63	; ?
+	SYS_rand_mem	= $b63	; ?
+	Palette_cycle_index	= $b66	; ?

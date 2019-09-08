@@ -6,8 +6,6 @@
 DEFAULT_SCREEN_ADDR = 0
 DEFAULT_SCREEN_SIZE = (128*64)*2
 
-SYS_rand_mem=$A000    ; 3 bytes
-
 !macro SYS_RAND_SEED .v0, .v1, .v2 {
     lda #.v0
     sta SYS_rand_mem
