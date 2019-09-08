@@ -1,50 +1,54 @@
-!if MACHINE_C64 = 1 {
-	VERA_BASE =$df00
-} else {
-	VERA_BASE =$9f20
-}
-VERA_ADDR_BANK  = VERA_BASE+0
-VERA_ADDR_HIGH  = VERA_BASE+1
-VERA_ADDR_LOW   = VERA_BASE+2
-VERA_DATA       = VERA_BASE+3
-VERA_DATA2      = VERA_BASE+4
-VERA_CTRL       = VERA_BASE+5
-VERA_IRQ_CTRL   = VERA_BASE+6
-VERA_IRQ        = VERA_BASE+7
+!addr {
+	!if MACHINE_C64 = 1 {
+		VERA_base = $df00
+	} else {
+		VERA_base = $9f20
+	}
+	VERA_addr_bank  = VERA_base+0
+	VERA_addr_high  = VERA_base+1
+	VERA_addr_low   = VERA_base+2
+	VERA_data       = VERA_base+3
+	VERA_data2      = VERA_base+4
+	VERA_ctrl       = VERA_base+5
+	VERA_irq_ctrl   = VERA_base+6
+	VERA_irq        = VERA_base+7
 
-VRAM_LAYER1   = $40000
-VRAM_LAYER2   = $40010
-VRAM_SPRINFO  = $40020
-VRAM_COMPOSER = $40040
-VRAM_PALETTE  = $40200
-VRAM_SPRDATA  = $40800
+	VRAM_layer1   = $40000
+	VRAM_layer2   = $40010
+	VRAM_sprinfo  = $40020
+	VRAM_composer = $40040
+	VRAM_palette  = $40200
+	VRAM_sprdata  = $40800
+
+	VROM_petscii = $20000
+}
 
 !macro VERA_SELECT_ADDR .addr {
 	lda #.addr
-	sta VERA_CTRL
+	sta VERA_ctrl
 }
 
 !macro VERA_SET_ADDR .addr, .stride {
 	lda #<(.addr >> 16) | (.stride << 4)
-	sta VERA_ADDR_BANK
+	sta VERA_addr_bank
 	lda #<(.addr >> 8)
-	sta VERA_ADDR_HIGH
+	sta VERA_addr_high
 	lda #<(.addr)
-	sta VERA_ADDR_LOW
+	sta VERA_addr_low
 }
 
 !macro VERA_SET_ADDR .addr {
 	lda #<(.addr >> 16) | $10
-	sta VERA_ADDR_BANK
+	sta VERA_addr_bank
 	lda #<(.addr >> 8)
-	sta VERA_ADDR_HIGH
+	sta VERA_addr_high
 	lda #<(.addr)
-	sta VERA_ADDR_LOW
+	sta VERA_addr_low
 }
 
 !macro VERA_WRITE .v0 {
 	lda #.v0
-	sta VERA_DATA
+	sta VERA_data
 }
 
 !macro VERA_WRITE .v0, .v1 {
@@ -82,30 +86,34 @@ VRAM_SPRDATA  = $40800
 
 !macro VPEEK .addr {
 	+VERA_SET_ADDR .addr
-	lda VERA_DATA
+	lda VERA_data
 }
 
 !macro VERA_SET_SPRITE .sprite_index {
-	+VERA_SET_ADDR (VRAM_SPRDATA + (.sprite_index << 3))
+	+VERA_SET_ADDR (VRAM_sprdata + (.sprite_index << 3))
 }
 
 !macro VERA_SET_PALETTE .palette_index {
-	+VERA_SET_ADDR (VRAM_PALETTE + (.palette_index << 5))
+	+VERA_SET_ADDR (VRAM_palette + (.palette_index << 5))
+}
+
+!macro VERA_SET_PALETTE .palette_index, .color_offset {
+	+VERA_SET_ADDR (VRAM_palette + (.palette_index << 5) + (.color_offset << 1))
 }
 
 !macro VERA_RESET {
 	lda #$80
-	sta VERA_CTRL
+	sta VERA_ctrl
 }
 
 !macro video_init {
 	lda #0
-	sta VERA_CTRL ; set ADDR1 active
-	sta VERA_ADDR_HIGH
+	sta VERA_ctrl ; set ADDR1 active
+	sta VERA_addr_high
 	lda #$14    ; $40040 - Composer output mode and chroma toggle
-	sta VERA_ADDR_BANK
+	sta VERA_addr_bank
 	lda #$40
-	sta VERA_ADDR_LOW
+	sta VERA_addr_low
 	lda #1
-	sta VERA_DATA ; VGA output
+	sta VERA_data ; VGA output
 }

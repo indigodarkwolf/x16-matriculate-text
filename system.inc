@@ -1,3 +1,4 @@
+; File header of encoded BASIC commands to start execution
 !macro SYS_HEADER { 
     !byte $0b,$08,$01,$00,$9e,$32,$30,$36,$31,$00,$00,$00
 }
@@ -17,15 +18,6 @@
     PLA
     rti
 }
-
-SYS_USER_MEMORY=$0800
-SYS_USER_MEMORY_SIZE=($9F00 - SYS_USER_MEMORY)
-
-SYS_USER_MEMORY2=$00FB
-SYS_USER_MEMORY2_SIZE=5     ; Seems like a likely place for storing copy params...
-
-SYS_USER_MEMORY3=$0003
-SYS_USER_MEMORY3_SIZE=($0090 - SYS_USER_MEMORY3)
 
 ; Generic "copy a block of data from A to B" macro
 !macro SYS_COPY .src, .dst, .size {
@@ -171,7 +163,7 @@ SYS_USER_MEMORY3_SIZE=($0090 - SYS_USER_MEMORY3)
         lda #>.size ; number of pages to copy
         sta $FF
 
-        ldy #$00 ; reset y for our loop
+        ldy #0 ; reset y for our loop
 @loop:
         lda .src
         sta .dst
@@ -185,7 +177,7 @@ SYS_USER_MEMORY3_SIZE=($0090 - SYS_USER_MEMORY3)
                     ; If we're not copying exactly some number of pages, include
                     ; the "copy the rest of it" section
         ldy #0
-        ldx #.size
+        ldx #<.size
 @loop2:
         lda .src
         sta .dst
