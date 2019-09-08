@@ -197,6 +197,10 @@ Irq_handler:
     adc #0
     sta Palette_cycle_index
 
+;
+; Palette cycle for the letters glowing and stuff
+;
+
     ; Set the starting address of the VRAM palette we're going to cycle
     asl ; Palette_cycle_index * 2 == Address offset into palette memory
     ; adc #<(VRAM_palette) ; We happen to know that #<(VRAM_palette) is 0. Being able to skip this also preserves Carry in case it was set
@@ -215,6 +219,47 @@ Irq_handler:
 NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
 
     ldx Palette_cycle_index
+    ldy #0
+
+-   lda ($FB),Y
+    sta VERA_data
+    iny
+    lda ($FB),Y
+    sta VERA_data
+    iny
+    inx
+    bne +
+    +VERA_SET_PALETTE 0, 1
++   cpy #(MATRIX_PALETTE_END - MATRIX_PALETTE)
+    bne -
+
+;
+; Palette cycle (redux) for double-density!
+;
+    lda Palette_cycle_index
+    adc #128
+    clc
+
+    ; Set the starting address of the VRAM palette we're going to cycle
+    asl ; Palette_cycle_index * 2 == Address offset into palette memory
+    ; adc #<(VRAM_palette) ; We happen to know that #<(VRAM_palette) is 0. Being able to skip this also preserves Carry in case it was set
+    sta VERA_addr_low
+    lda #<(VRAM_palette >> 8)
+    adc #0  ; Add carry bit for indices 128-255
+    sta VERA_addr_high
+    lda #<(VRAM_palette >> 16) | (1 << 4)
+    sta VERA_addr_bank
+
+    lda #<MATRIX_PALETTE
+    sta $FB
+    lda #>MATRIX_PALETTE
+    sta $FC
+
+NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
+
+    lda Palette_cycle_index
+    adc #128
+    tax
     ldy #0
 
 -   lda ($FB),Y
@@ -299,11 +344,10 @@ PETSCII_TABLE:
     }
 
 MATRIX_PALETTE:
-    !le16 $0000, $0000, $0000, $0000, $0020, $0020, $0030, $0030 
-    !le16 $0040, $0040, $0050, $0050, $0060, $0060, $0070, $0070 
-    !le16 $0080, $0080, $0090, $0090, $00A0, $00A0, $00B0, $00B0
-    !le16 $00C0, $00C0, $00D0, $00D0, $00E0, $00E0, $00F0, $00F0
-    !le16 $08FC
+    !le16 $0000, $0000, $0020, $0020, $0030, $0030, $0040, $0040
+    !le16 $0050, $0050, $0060, $0060, $0070, $0070, $0080, $0080
+    !le16 $0090, $0090, $00A0, $00A0, $00B0, $00B0, $00C0, $00C0
+    !le16 $00D0, $00D0, $00E0, $00E0, $00F0, $00F0, $08FC
 MATRIX_PALETTE_END:
 MATRIX_PALETTE_REV:
     !le16 $0000, $0000, $04F4, $08FC, $00F0, $00F0, $00E0, $00E0
