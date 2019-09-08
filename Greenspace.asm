@@ -39,17 +39,50 @@ SYS_rand_mem=$A000    ; 3 bytes
 Start:
     +SYS_STREAM_OUT MATRIX_PALETTE, $A100, 16*16
 
-    +SYS_RAND_SEED $34, $56, $78
+    +SYS_RAND_SEED $34, $56, $fe
 
     +VERA_SET_ADDR VRAM_layer1
     +VERA_WRITE ($01 << 5) | $01            ; Mode 1 (256-color text), enabled
-    +VERA_WRITE $0A                         ; 8x8 tiles, 64x32 map
+    +VERA_WRITE %00000110                   ; 8x8 tiles, 128x64 map
     +VERA_WRITE <(DEFAULT_SCREEN_ADDR >> 2) ; Map indices at VRAM address 0
     +VERA_WRITE >(DEFAULT_SCREEN_ADDR >> 2) ; 
     +VERA_WRITE <(VROM_petscii >> 2)        ; Tile data immediately after map indices
     +VERA_WRITE >(VROM_petscii >> 2)        ; Tile data immediately after map indices
     +VERA_WRITE 0, 0, 0, 0                  ; Hscroll and VScroll to 0
     
+Clear_video_memory:
+!zn Clear_video_memory {
+    +VERA_SET_ADDR DEFAULT_SCREEN_ADDR, 2
+    +VERA_SELECT_ADDR 1
+    +VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
+    +VERA_SELECT_ADDR 0
+
+    ldx #0
+    ldy #0
+
+.yloop:
+    tya
+    pha
+.xloop:
+    txa
+    pha
+
+    lda #0
+    sta VERA_data
+    sta VERA_data2
+
+    pla
+    tax
+    dex
+    bne .xloop
+
+    pla
+    tay
+    dey
+    bne .yloop
+}
+
+Fill_text_buffer_with_random_chars:
 !zn Fill_text_buffer_with_random_chars {
     +VERA_SET_ADDR DEFAULT_SCREEN_ADDR, 2
 
@@ -63,10 +96,10 @@ Start:
     txa
 
     jsr Sys_rand
-    +MOD $7F
+    and #$7F
     tay
 
-    lda PETSCII_TABLE,Y    
+    lda PETSCII_TABLE,Y
     sta VERA_data
 
     tax
@@ -79,13 +112,13 @@ Start:
     bne .yloop
 }
 
+Offset_palette_of_each_column:
 !zn Offset_palette_of_each_column {
     +VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
 
-    ldx #128
+    lda #128
 
 .xloop:
-    txa
     pha
 
     jsr Sys_rand
@@ -97,8 +130,8 @@ Start:
 +   sta VERA_data
 
     pla
-    tax
-    dex
+    sec
+    sbc #1
     bne .xloop
 }
 
@@ -123,7 +156,7 @@ Fill_palette_of_remaining_chars:
     adc #1
     ; If we're about to assign palette index 0 (background), increment to 1
     cmp #0
-    beq +
+    bne +
     clc
     adc #1
 +   sta VERA_data2
@@ -161,10 +194,9 @@ Irq_handler:
     clc
     adc #1
     ; Skip index zero, that's the background, we want to leave it black.
-    bcc +
     adc #0
-+   sta Palette_cycle_index
-    clc
+    sta Palette_cycle_index
+
     ; Set the starting address of the VRAM palette we're going to cycle
     asl ; Palette_cycle_index * 2 == Address offset into palette memory
     ; adc #<(VRAM_palette) ; We happen to know that #<(VRAM_palette) is 0. Being able to skip this also preserves Carry in case it was set
@@ -175,92 +207,28 @@ Irq_handler:
     lda #<(VRAM_palette >> 16) | (1 << 4)
     sta VERA_addr_bank
 
-    ; lda #$F0
-    ; sta VERA_data
-    ; lda #00
-    ; sta VERA_data 
-    ; jmp .irq_end   
-
     lda #<MATRIX_PALETTE
     sta $FB
     lda #>MATRIX_PALETTE
     sta $FC
 
-    ; The palette has room for 256 colors, let's make sure we don't
-    ; try to exceed that. (Technically the memory immediately following)
-    ; the palette is unassigned, but it may still be undefined behavior
-    ; in final hardware.)
-
-    ; Find the number of palette indices we have room for
-    lda #0
-    sec
-    sbc Palette_cycle_index
-
 NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
 
-    ; If we have more room than needed, skip to copying
-    ; everything.
-    cmp #<(NUM_MATRIX_PALETTE_ENTRIES)
-    bcs .skip_first_block
+    ldx Palette_cycle_index
+    ldy #0
 
-    clc
-    asl     ; 2 bytes per color for total bytes we want to copy
-    sta $FF
-
-    ; copy what we have room for at the end
-    tax
-+   ldy #0
 -   lda ($FB),Y
     sta VERA_data
     iny
-    dex
+    lda ($FB),Y
+    sta VERA_data
+    iny
+    inx
+    bne +
+    +VERA_SET_PALETTE 0, 1
++   cpy #(MATRIX_PALETTE_END - MATRIX_PALETTE)
     bne -
 
-Setup_for_remainder:
-    ; Palette start addr += (What we had room for)
-    lda $FB
-    adc $FF
-    sta $FB
-    bcc +
-    inc $FC
-
-    ; Palette entries remaining = Total - (What we had room for)
-    ; e.g. Remaining = -(What we had room for) + Total
-+   lda #(MATRIX_PALETTE_END - MATRIX_PALETTE)
-    sec
-    sbc $FF
-    sec
-    sbc $FF
-    sta $FF
-
-    ; Remaining palette writes start from the beginning of the palette buffer
-    +VERA_SET_PALETTE 0, 1
-
-    jmp .copy_remainder
-
-.skip_first_block:
-    lda #<NUM_MATRIX_PALETTE_ENTRIES
-    asl
-    sta $FF
-
-.copy_remainder:
-;     bcc +   ; Whoops, do we have more than 255 bytes to copy? Copy a page.
-;     ldy #0
-; -   lda ($FB),Y
-;     sta VERA_data
-;     iny
-;     bne -
-;     inc $FC
-
-+   ldy #0
--   lda ($FB),Y
-    sta VERA_data
-    iny
-    cpy $FF
-    bmi -
-
-    jmp .irq_end
-.irq_end:
     +SYS_END_IRQ
 
 Sys_rand:
@@ -335,17 +303,17 @@ MATRIX_PALETTE:
     !le16 $0040, $0040, $0050, $0050, $0060, $0060, $0070, $0070 
     !le16 $0080, $0080, $0090, $0090, $00A0, $00A0, $00B0, $00B0
     !le16 $00C0, $00C0, $00D0, $00D0, $00E0, $00E0, $00F0, $00F0
-    !le16 $08FC, $04F4, $0000, $0000
+    !le16 $08FC
 MATRIX_PALETTE_END:
 MATRIX_PALETTE_REV:
     !le16 $0000, $0000, $04F4, $08FC, $00F0, $00F0, $00E0, $00E0
     !le16 $00D0, $00D0, $00C0, $00C0, $00B0, $00B0, $00A0, $00A0
     !le16 $0090, $0090, $0080, $0080, $0070, $0070, $0060, $0060
     !le16 $0050, $0050, $0040, $0040, $0030, $0030, $0020, $0020
-    !le16 $0010, $0010, $0000, $0000
+    !le16 $0010
 MATRIX_PALETTE_REV_END:
 
-Palette_cycle_index: !byte $00
+!src "variables.inc"
 
 !if * > $9EFF {
     !warn "Program size exceeds Fixed RAM space."
