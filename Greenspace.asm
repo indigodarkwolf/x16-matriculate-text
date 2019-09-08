@@ -37,8 +37,6 @@ SYS_rand_mem=$A000    ; 3 bytes
 
     ; +VERA_RESET
 Start:
-    +SYS_STREAM_OUT MATRIX_PALETTE, $A100, 16*16
-
     +SYS_RAND_SEED $34, $56, $fe
 
     +VERA_SET_ADDR VRAM_layer1
