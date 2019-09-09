@@ -16,26 +16,92 @@ DEFAULT_SCREEN_SIZE = (128*64)*2
 }
 
 !macro MOD .v {
-; !if .v < $80 {
 -   sec
     sbc #.v
     bcs -
     adc #.v
-; } else {
-;     sec
-;     sbc #.v
-;     bcs @skip
-;     adc #.v
-; @skip:
-; }
 }
 
 *=$0801
     +SYS_HEADER
 
-    ; +VERA_RESET
 Start:
     +SYS_RAND_SEED $34, $56, $fe
+
+.decrement_palette:
+    lda #1
+    sta All_palettes_cleared    ; This is an optimistic flag: have we cleared the entire palette? We'll falsify if not.
+
+    ; Let's assume the system is starting in Mode 0 with the default palette.
+    ; And fade out the screen because we can.
+    +VERA_SELECT_ADDR 0
+    +VERA_SET_PALETTE 0
+    +VERA_SELECT_ADDR 1
+    +VERA_SET_PALETTE 0
+
+    ldy #0 ; 256 colors in the palette
+
+.decrement_palette_entry:
+    lda VERA_data
+    ; Don't need to decrement if already #0 (black)
+    cmp #0
+    beq +
+
+    ; The first byte is %0000rrrr, which means we could get away just a
+    ; decrement. But the second is %ggggbbbb, so we need to decrement 
+    ; each half if not 0. Instead of complex assembly to do that, I'm just 
+    ; going to precompute to a table and do a lookup of the next value.
+    ; And since I did it that way for the second byte, do it the same
+    ; way for the first as well since that answer is good for both.
+    tax
+
+    lda #0
+    sta All_palettes_cleared
+
+    lda PALETTE_DECREMENT_TABLE, X
++   sta VERA_data2
+
+    lda VERA_data
+
+    ; Still don't need to decrement 0.
+    cmp #0
+    beq +
+
+    tax
+
+    lda #0
+    sta All_palettes_cleared
+
+    lda PALETTE_DECREMENT_TABLE, X
++   sta VERA_data2
+
+    dey
+    bne .decrement_palette_entry
+
+    +SYS_SET_IRQ Inc_new_frame
+    cli
+    ; Tight loop until next frame
+-   lda New_frame
+    cmp #$01
+    bne -
+
+    sei
+
+Is_palette_fade_done:
+    lda #0
+    sta New_frame
+
+    lda All_palettes_cleared
+    cmp #0
+    beq .decrement_palette
+
+    ;
+    ; Palette memory should now be all 0s, or a black screen.
+    ; If only the composer gave us a brightness setting, I could
+    ; have used that. Mei banfa.
+    ;
+
+    +VERA_SELECT_ADDR 0
 
     +VERA_SET_ADDR VRAM_layer1
     +VERA_WRITE ($01 << 5) | $01            ; Mode 1 (256-color text), enabled
@@ -272,6 +338,10 @@ NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
 
     +SYS_END_IRQ
 
+Inc_new_frame:
+    inc New_frame
+    +SYS_END_IRQ
+
 Sys_rand:
     ldx #8
     lda SYS_rand_mem
@@ -352,6 +422,25 @@ MATRIX_PALETTE_REV:
     !le16 $0050, $0050, $0040, $0040, $0030, $0030, $0020, $0020
     !le16 $0010
 MATRIX_PALETTE_REV_END:
+
+PALETTE_DECREMENT_TABLE:
+    ;     $X0, $X1, $X2, $X3, $X4, $X5, $X6, $X7, $X8, $X9, $XA, $XB, $XC, $XD, $XE, $XF
+    !byte $00, $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0A, $0B, $0C, $0D, $0E    ; $0X
+    !byte $00, $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0A, $0B, $0C, $0D, $0E    ; $1X
+    !byte $10, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $1A, $1B, $1C, $1D, $1E    ; $2X
+    !byte $20, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $2A, $2B, $2C, $2D, $2E    ; $3X
+    !byte $30, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $3A, $3B, $3C, $3D, $3E    ; $4X
+    !byte $40, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $4A, $4B, $4C, $4D, $4E    ; $5X
+    !byte $50, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $5A, $5B, $5C, $5D, $5E    ; $6X
+    !byte $60, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $6A, $6B, $6C, $6D, $6E    ; $7X
+    !byte $70, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $7A, $7B, $7C, $7D, $7E    ; $8X
+    !byte $80, $80, $81, $82, $83, $84, $85, $86, $87, $88, $89, $8A, $8B, $8C, $8D, $8E    ; $9X
+    !byte $90, $90, $91, $92, $93, $94, $95, $96, $97, $98, $99, $9A, $9B, $9C, $9D, $9E    ; $AX
+    !byte $A0, $A0, $A1, $A2, $A3, $A4, $A5, $A6, $A7, $A8, $A9, $AA, $AB, $AC, $AD, $AE    ; $BX
+    !byte $B0, $B0, $B1, $B2, $B3, $B4, $B5, $B6, $B7, $B8, $B9, $BA, $BB, $BC, $BD, $BE    ; $CX
+    !byte $C0, $C0, $C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $C9, $CA, $CB, $CC, $CD, $CE    ; $DX
+    !byte $D0, $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DC, $DD, $DE    ; $EX
+    !byte $E0, $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $EB, $EC, $ED, $EE    ; $FX
 
 !src "variables.inc"
 
