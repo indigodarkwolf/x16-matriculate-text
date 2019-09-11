@@ -1,6 +1,6 @@
 @echo off
 
-set EMU_DIR=..\..\vs2019\x16emu\bin
+set EMU_DIR=..\..\vs2019\bin
 set ASM=bin\acme\acme.exe
 set ASM_OPTS=-f cbm -DMACHINE_C64=0
 

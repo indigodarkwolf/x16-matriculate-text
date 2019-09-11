@@ -1,19 +1,20 @@
 !symbollist "greenspace.sym"
 
+;=================================================
+; Headers
+;
+;-------------------------------------------------
+
 !src "vera.inc"
 !src "system.inc"
 
+;=================================================
+; Macros
+;
+;-------------------------------------------------
+
 DEFAULT_SCREEN_ADDR = 0
 DEFAULT_SCREEN_SIZE = (128*64)*2
-
-!macro SYS_RAND_SEED .v0, .v1, .v2 {
-    lda #.v0
-    sta SYS_rand_mem
-    lda #.v1
-    sta SYS_rand_mem+1
-    lda #.v2
-    sta SYS_rand_mem+2
-}
 
 !macro MOD .v {
 -   sec
@@ -22,8 +23,7 @@ DEFAULT_SCREEN_SIZE = (128*64)*2
     adc #.v
 }
 
-*=$0801
-    +SYS_HEADER
+    +SYS_HEADER_0801
 
 Start:
     +SYS_RAND_SEED $34, $56, $fe
@@ -58,7 +58,7 @@ Start:
     lda #0
     sta All_palettes_cleared
 
-    lda PALETTE_DECREMENT_TABLE, X
+    lda Palette_decrement_table, X
 +   sta VERA_data2
 
     lda VERA_data
@@ -72,7 +72,7 @@ Start:
     lda #0
     sta All_palettes_cleared
 
-    lda PALETTE_DECREMENT_TABLE, X
+    lda Palette_decrement_table, X
 +   sta VERA_data2
 
     dey
@@ -157,11 +157,11 @@ Fill_text_buffer_with_random_chars:
 .xloop:
     txa
 
-    jsr Sys_rand
+    jsr sys_rand
     and #$7F
     tay
 
-    lda PETSCII_TABLE,Y
+    lda Petscii_table,Y
     sta VERA_data
 
     tax
@@ -183,7 +183,7 @@ Offset_palette_of_each_column:
 .xloop:
     pha
 
-    jsr Sys_rand
+    jsr sys_rand
     ; If we're about to assign palette index 0 (background), increment to 1
     cmp #0
     beq +
@@ -236,8 +236,8 @@ Fill_palette_of_remaining_chars:
 
     +VERA_SELECT_ADDR 0
     +VERA_SET_PALETTE 0
-    +SYS_STREAM_OUT MATRIX_PALETTE_REV, VERA_data, 16*2
-    +SYS_STREAM MATRIX_PALETTE_REV, VERA_data, 16*30
+    +SYS_STREAM_OUT Matrix_palette_rev, VERA_data, 16*2
+    +SYS_STREAM Matrix_palette_rev, VERA_data, 16*30
 
     +SYS_SET_IRQ Irq_handler
     cli
@@ -273,12 +273,12 @@ Irq_handler:
     lda #<(VRAM_palette >> 16) | (1 << 4)
     sta VERA_addr_bank
 
-    lda #<MATRIX_PALETTE
+    lda #<Matrix_palette
     sta $FB
-    lda #>MATRIX_PALETTE
+    lda #>Matrix_palette
     sta $FC
 
-NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
+NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 
     ldx Palette_cycle_index
     ldy #0
@@ -292,7 +292,7 @@ NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
     inx
     bne +
     +VERA_SET_PALETTE 0, 1
-+   cpy #(MATRIX_PALETTE_END - MATRIX_PALETTE)
++   cpy #(Matrix_palette_end - Matrix_palette)
     bne -
 
 ;
@@ -312,12 +312,12 @@ NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
     lda #<(VRAM_palette >> 16) | (1 << 4)
     sta VERA_addr_bank
 
-    lda #<MATRIX_PALETTE
+    lda #<Matrix_palette
     sta $FB
-    lda #>MATRIX_PALETTE
+    lda #>Matrix_palette
     sta $FC
 
-NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
+NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 
     lda Palette_cycle_index
     adc #128
@@ -333,7 +333,7 @@ NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
     inx
     bne +
     +VERA_SET_PALETTE 0, 1
-+   cpy #(MATRIX_PALETTE_END - MATRIX_PALETTE)
++   cpy #(Matrix_palette_end - Matrix_palette)
     bne -
 
     +SYS_END_IRQ
@@ -341,20 +341,6 @@ NUM_MATRIX_PALETTE_ENTRIES = ((MATRIX_PALETTE_END - MATRIX_PALETTE) >> 1)
 Inc_new_frame:
     inc New_frame
     +SYS_END_IRQ
-
-Sys_rand:
-    ldx #8
-    lda SYS_rand_mem
--   asl
-    rol SYS_rand_mem+1
-    rol SYS_rand_mem+2
-    bcc +
-    eor #$1B
-+   dex
-    bne -
-    sta SYS_rand_mem
-    cmp #0
-    rts
 
 ;==============================================
 ; VERA_stream_out_data
@@ -401,7 +387,17 @@ VERA_stream_out_data:
     bne @loop2
     rts
 
-PETSCII_TABLE:
+;=================================================
+; Libs
+;
+;-------------------------------------------------
+!src "system.asm"
+
+;=================================================
+; Data
+;
+;-------------------------------------------------
+Petscii_table:
     !for i,1,$60 {
         !byte i
     }
@@ -409,21 +405,20 @@ PETSCII_TABLE:
         !byte i+$A0
     }
 
-MATRIX_PALETTE:
+Matrix_palette:
     !le16 $0000, $0000, $0020, $0020, $0030, $0030, $0040, $0040
     !le16 $0050, $0050, $0060, $0060, $0070, $0070, $0080, $0080
     !le16 $0090, $0090, $00A0, $00A0, $00B0, $00B0, $00C0, $00C0
     !le16 $00D0, $00D0, $00E0, $00E0, $00F0, $00F0, $08FC
-MATRIX_PALETTE_END:
-MATRIX_PALETTE_REV:
-    !le16 $0000, $0000, $04F4, $08FC, $00F0, $00F0, $00E0, $00E0
-    !le16 $00D0, $00D0, $00C0, $00C0, $00B0, $00B0, $00A0, $00A0
-    !le16 $0090, $0090, $0080, $0080, $0070, $0070, $0060, $0060
-    !le16 $0050, $0050, $0040, $0040, $0030, $0030, $0020, $0020
-    !le16 $0010
-MATRIX_PALETTE_REV_END:
+Matrix_palette_end:
+Matrix_palette_rev:
+    !le16 $0000, $0000, $08FC, $00F0, $00F0, $00E0, $00E0, $00D0
+    !le16 $00D0, $00C0, $00C0, $00B0, $00B0, $00A0, $00A0, $0090
+    !le16 $0090, $0080, $0080, $0070, $0070, $0060, $0060, $0050
+    !le16 $0050, $0040, $0040, $0030, $0030, $0020, $0020
+Matrix_palette_rev_end:
 
-PALETTE_DECREMENT_TABLE:
+Palette_decrement_table:
     ;     $X0, $X1, $X2, $X3, $X4, $X5, $X6, $X7, $X8, $X9, $XA, $XB, $XC, $XD, $XE, $XF
     !byte $00, $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0A, $0B, $0C, $0D, $0E    ; $0X
     !byte $00, $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0A, $0B, $0C, $0D, $0E    ; $1X
@@ -442,8 +437,11 @@ PALETTE_DECREMENT_TABLE:
     !byte $D0, $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DC, $DD, $DE    ; $EX
     !byte $E0, $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $EB, $EC, $ED, $EE    ; $FX
 
-!src "variables.inc"
+;=================================================
+; Variables
+;
+;-------------------------------------------------
+!src "greenspace_vars.asm"
+!src "system_vars.asm"
 
-!if * > $9EFF {
-    !warn "Program size exceeds Fixed RAM space."
-}
+    +SYS_FOOTER

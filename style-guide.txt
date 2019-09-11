@@ -88,10 +88,22 @@ sys_function_names_from_a_lib_are_prefixed_with_a_subsytem_name_or_abbreviation:
     ; use it.
 
 ;=================================================
+; Libs
+;
+;-------------------------------------------------
+!src "library_definitions_and_implementations_are_in_a_source_file_with_an_extension_of.asm"
+
+;=================================================
+; Data
+;
+;-------------------------------------------------
+Constant_data_variables_go_into_their_own_block:
+    !byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
+;=================================================
 ; Variables
 ;
 ;-------------------------------------------------
-
 Global_variable_labels_begin_with_upper_case: !byte $00
 Sys_global_variables_from_a_lib_are_prefixed_with_a_subsystem_name_or_abbreviation: !byte 00
 
@@ -104,14 +116,8 @@ Large_blocks_of_data_begin_on_the_following_line:
 ; Avoid putting more than 16 bytes on a single line, for readability.
 
 !src "external_variables_go_into_a_source_file_ending_with_vars.asm"
-!src "sys_vars.asm"    ; sys_vars always comes last. 
+!src "system_vars.asm"    ; system_vars always comes last. 
 
 ; sys_vars.asm includes a label to the end of the variables list
 ; which is referenced for defines, such as when reserving complex
 ; blocks of memory.
-
-;=================================================
-; Libs
-;
-;-------------------------------------------------
-!src "library_definitions_and_implementations_are_in_a_source_file_with_an_extension_of.asm"

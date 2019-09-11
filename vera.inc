@@ -1,3 +1,6 @@
+!ifdef VERA_INC !eof
+VERA_INC=1
+
 !addr {
 	!if MACHINE_C64 = 1 {
 		VERA_base = $df00
