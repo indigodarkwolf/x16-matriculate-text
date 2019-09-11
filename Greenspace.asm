@@ -1,7 +1,9 @@
 !symbollist "greenspace.sym"
 
 ;=================================================
-; Headers
+;=================================================
+; 
+;   Headers
 ;
 ;-------------------------------------------------
 
@@ -16,6 +18,15 @@
 DEFAULT_SCREEN_ADDR = 0
 DEFAULT_SCREEN_SIZE = (128*64)*2
 
+;=================================================
+; MOD
+;   Module the accumulator by a value.
+;-------------------------------------------------
+; INPUTS:   .v  Divisor of the modulo
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
 !macro MOD .v {
 -   sec
     sbc #.v
@@ -25,12 +36,20 @@ DEFAULT_SCREEN_SIZE = (128*64)*2
 
     +SYS_HEADER_0801
 
-Start:
+;=================================================
+;=================================================
+; 
+;   main code
+;
+;-------------------------------------------------
+start:
     +SYS_RAND_SEED $34, $56, $fe
 
 .decrement_palette:
+    ; This is an optimistic flag: have we cleared the entire palette? 
+    ; We'll falsify if not.
     lda #1
-    sta All_palettes_cleared    ; This is an optimistic flag: have we cleared the entire palette? We'll falsify if not.
+    sta All_palettes_cleared
 
     ; Let's assume the system is starting in Mode 0 with the default palette.
     ; And fade out the screen because we can.
@@ -78,7 +97,7 @@ Start:
     dey
     bne .decrement_palette_entry
 
-    +SYS_SET_IRQ Inc_new_frame
+    +SYS_SET_IRQ inc_new_frame
     cli
     ; Tight loop until next frame
 -   lda New_frame
@@ -87,7 +106,7 @@ Start:
 
     sei
 
-Is_palette_fade_done:
+__start__is_palette_fade_done:
     lda #0
     sta New_frame
 
@@ -111,9 +130,9 @@ Is_palette_fade_done:
     +VERA_WRITE <(VROM_petscii >> 2)        ; Tile data immediately after map indices
     +VERA_WRITE >(VROM_petscii >> 2)        ; Tile data immediately after map indices
     +VERA_WRITE 0, 0, 0, 0                  ; Hscroll and VScroll to 0
-    
-Clear_video_memory:
-!zn Clear_video_memory {
+
+!zn __start__clear_video_memory {
+__start__clear_video_memory:
     +VERA_SET_ADDR DEFAULT_SCREEN_ADDR, 2
     +VERA_SELECT_ADDR 1
     +VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
@@ -144,8 +163,8 @@ Clear_video_memory:
     bne .yloop
 }
 
-Fill_text_buffer_with_random_chars:
-!zn Fill_text_buffer_with_random_chars {
+!zn __start__fill_text_buffer_with_random_chars {
+__start__fill_text_buffer_with_random_chars:
     +VERA_SET_ADDR DEFAULT_SCREEN_ADDR, 2
 
     ldx #128
@@ -174,8 +193,8 @@ Fill_text_buffer_with_random_chars:
     bne .yloop
 }
 
-Offset_palette_of_each_column:
-!zn Offset_palette_of_each_column {
+!zn __start__offset_palette_of_each_column {
+__start__offset_palette_of_each_column:
     +VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
 
     lda #128
@@ -197,11 +216,12 @@ Offset_palette_of_each_column:
     bne .xloop
 }
 
-!zn Fill_palette_of_remaining_chars {
-Fill_palette_of_remaining_chars:
+!zn __start__fill_palette_of_remaining_chars {
+__start__fill_palette_of_remaining_chars:
     +VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
     +VERA_SELECT_ADDR 1
     +VERA_SET_ADDR DEFAULT_SCREEN_ADDR+257, 2
+    +VERA_SELECT_ADDR 0
 
     ldx #127
     ldy #64
@@ -234,23 +254,33 @@ Fill_palette_of_remaining_chars:
     bne .yloop
 }
 
-    +VERA_SELECT_ADDR 0
-    +VERA_SET_PALETTE 0
-    +SYS_STREAM_OUT Matrix_palette_rev, VERA_data, 16*2
-    +SYS_STREAM Matrix_palette_rev, VERA_data, 16*30
-
-    +SYS_SET_IRQ Irq_handler
+    +SYS_SET_IRQ irq_handler
     cli
 
     jmp *
 
     ; +VERA_RESET
 
-; This is essentially my "do_frame". Several others have been doing this as well.
-; Since the IRQ is triggered at the beginning of the VGA/NTSA front porch, we don't
-; get the benefit of the entire VBLANK, but it's still useful as a "do this code
-; once per frame" function.
-Irq_handler:
+;=================================================
+;=================================================
+; 
+;   IRQ Handlers
+;
+;-------------------------------------------------
+
+;=================================================
+; irq_handler
+;   This is essentially my "do_frame". Several others have been doing this as well.
+;   Since the IRQ is triggered at the beginning of the VGA/NTSA front porch, we don't
+;   get the benefit of the entire VBLANK, but it's still useful as a "do this code
+;   once per frame" function.
+;-------------------------------------------------
+; INPUTS: (none)
+;
+;-------------------------------------------------
+; MODIFIES: A, X, Y, VRAM_palette
+; 
+irq_handler:
     ; Increment which palette index we're starting at
     lda Palette_cycle_index
     clc
@@ -338,9 +368,41 @@ NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 
     +SYS_END_IRQ
 
-Inc_new_frame:
+;=================================================
+; inc_new_frame
+;   This is essentially my "do_frame". Several others have been doing this as well.
+;   Since the IRQ is triggered at the beginning of the VGA/NTSA front porch, we don't
+;   get the benefit of the entire VBLANK, but it's still useful as a "do this code
+;   once per frame" function.
+;-------------------------------------------------
+; INPUTS:   Sys_rand_mem
+;
+;-------------------------------------------------
+; MODIFIES: A, X, Sys_rand_mem
+; 
+inc_new_frame:
     inc New_frame
     +SYS_END_IRQ
+
+;=================================================
+;=================================================
+; 
+;   Miscellaneous data copying
+;
+;-------------------------------------------------
+;
+; I wasn't sure what to do with this. I already have
+; SYS_STREAM_OUT, but I basically needed it for 
+; a source address and quantity of data that can
+; only be determined at run-time. I'm I'll eventually
+; convert this into some kind of other 
+; SYS_STREAM_OUT-like macro, so that I can
+; easily declare function definitions for a variety
+; of fixed destinations, and then come back and do 
+; the same for fixed sources with runtime destinations
+; and of course a function to just handle everything
+; being runtime data.
+;
 
 ;==============================================
 ; VERA_stream_out_data
@@ -388,13 +450,17 @@ VERA_stream_out_data:
     rts
 
 ;=================================================
-; Libs
+;=================================================
+; 
+;   Libs
 ;
 ;-------------------------------------------------
 !src "system.asm"
 
 ;=================================================
-; Data
+;=================================================
+; 
+;   Data
 ;
 ;-------------------------------------------------
 Petscii_table:
@@ -438,7 +504,9 @@ Palette_decrement_table:
     !byte $E0, $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $EB, $EC, $ED, $EE    ; $FX
 
 ;=================================================
-; Variables
+;=================================================
+;
+;   Variables
 ;
 ;-------------------------------------------------
 !src "greenspace_vars.asm"

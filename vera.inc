@@ -1,6 +1,13 @@
 !ifdef VERA_INC !eof
 VERA_INC=1
 
+;=================================================
+;=================================================
+;
+;   Memory-mapped registers
+;
+;-------------------------------------------------
+
 !addr {
 	!if MACHINE_C64 = 1 {
 		VERA_base = $df00
@@ -26,11 +33,38 @@ VERA_INC=1
 	VROM_petscii = $20000
 }
 
+;=================================================
+;=================================================
+;
+;   Macros
+;
+;-------------------------------------------------
+
+;=================================================
+; VERA_SELECT_ADDR
+;   Select which address channel to configure (VERA_data vs. VERA_data2)
+;-------------------------------------------------
+; INPUTS:   .addr	0 for VERA_data
+;					1 for VERA_data2
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
 !macro VERA_SELECT_ADDR .addr {
 	lda #.addr
 	sta VERA_ctrl
 }
 
+;=================================================
+; VERA_SET_ADDR (multiple)
+;   Set the current address channel's address
+;-------------------------------------------------
+; INPUTS:   .addr			VRAM address to set to
+;			[.stride = 1]	Address stride/auto-increment
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
 !macro VERA_SET_ADDR .addr, .stride {
 	lda #<(.addr >> 16) | (.stride << 4)
 	sta VERA_addr_bank
@@ -41,14 +75,20 @@ VERA_INC=1
 }
 
 !macro VERA_SET_ADDR .addr {
-	lda #<(.addr >> 16) | $10
-	sta VERA_addr_bank
-	lda #<(.addr >> 8)
-	sta VERA_addr_high
-	lda #<(.addr)
-	sta VERA_addr_low
+	+VERA_SET_ADDR .addr, 1
 }
 
+;=================================================
+; VERA_WRITE (multiple)
+;   Write values to VERA_data.
+;	If more than 8 values are needed, consider 
+;	the SYS_STREAM_* family.
+;-------------------------------------------------
+; INPUTS:   .v0 - .v7	Values to write
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
 !macro VERA_WRITE .v0 {
 	lda #.v0
 	sta VERA_data
@@ -57,6 +97,11 @@ VERA_INC=1
 !macro VERA_WRITE .v0, .v1 {
 	+VERA_WRITE .v0
 	+VERA_WRITE .v1
+}
+
+!macro VERA_WRITE .v0, .v1, .v2 {
+	+VERA_WRITE .v0, .v1
+	+VERA_WRITE .v2
 }
 
 !macro VERA_WRITE .v0, .v1, .v2, .v3 {
@@ -69,33 +114,45 @@ VERA_INC=1
 	+VERA_WRITE .v4, .v5, .v6, .v7
 }
 
-!macro VERA_WRITE .v0, .v1, .v2, .v3, .v4, .v5, .v6, .v7, .v8, .v9, .v10, .v11, .v12, .v13, .v14, .v15 {
-	+VERA_WRITE .v0, .v1, .v2, .v3, .v4, .v5, .v6, .v7
-	+VERA_WRITE .v8, .v9, .v10, .v11, .v12, .v13, .v14, .v15
-}
-
-!macro VERA_COPY .dst, .src, .bytes {
-	+VERA_SET_ADDR .dst, 0
-	ldx #<.bytes	; Pages
-	ldy #>.bytes	; Bytes
-@loop:
-
-	txa
-	cpy
-	tax
-	bne @loop
-@end:
-}
-
+;=================================================
+; VPEEK
+;   It's... VPEEK(), but in assembly.
+;-------------------------------------------------
+; INPUTS:   .addr	VRAM address to read from.
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
 !macro VPEEK .addr {
 	+VERA_SET_ADDR .addr
 	lda VERA_data
 }
 
+;=================================================
+; VERA_SET_SPRITE
+;   Set the current address channel to target
+;	an indexed sprite_data entry in VRAM_sprdata
+;-------------------------------------------------
+; INPUTS:   .sprite_index	Sprite index to target
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
 !macro VERA_SET_SPRITE .sprite_index {
 	+VERA_SET_ADDR (VRAM_sprdata + (.sprite_index << 3))
 }
 
+;=================================================
+; VERA_SET_PALETTE
+;   Set the current address channel to target
+;	an indexed palette  entry in VRAM_palette
+;-------------------------------------------------
+; INPUTS:   .palette_index		Palette index to target
+;			[.color_offset = 0]	Which color within the palette to target
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
 !macro VERA_SET_PALETTE .palette_index {
 	+VERA_SET_ADDR (VRAM_palette + (.palette_index << 5))
 }
@@ -104,12 +161,31 @@ VERA_INC=1
 	+VERA_SET_ADDR (VRAM_palette + (.palette_index << 5) + (.color_offset << 1))
 }
 
+;=================================================
+; VERA_RESET
+;   Reset the Vera to its default settings.
+;	See official documentation for specifics.
+;-------------------------------------------------
+; INPUTS:   (none)
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
 !macro VERA_RESET {
 	lda #$80
 	sta VERA_ctrl
 }
 
-!macro video_init {
+;=================================================
+; VIDEO_INIT
+;   Turn on the video display.
+;-------------------------------------------------
+; INPUTS:   (none)
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
+!macro VIDEO_INIT {
 	lda #0
 	sta VERA_ctrl ; set ADDR1 active
 	sta VERA_addr_high

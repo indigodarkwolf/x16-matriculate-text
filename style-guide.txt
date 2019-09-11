@@ -2,7 +2,9 @@ All_names_use_underscore_instead_of_camel_case
 Sorry_camel_peeps
 
 ;=================================================
-; Headers
+;=================================================
+;
+;   Section
 ;
 ;-------------------------------------------------
 ;
@@ -19,8 +21,12 @@ Sorry_camel_peeps
 ; Macros_have_a_header_comment
 ;   Briefly describing their purpose
 ;-------------------------------------------------
-; INPUTS:   .each_variable  Gets a description
-;
+; INPUTS:   .each_variable      Gets a description
+;           [.optional_params]  When defining multiple macros with the same name,
+;                               optional params are in brackets. They work like
+;                               optional params in C++17 - to specify a particular
+;                               param you must specify all previous ones as well.
+;           [.another = 2]      Another optional param, but with a default value
 ;-------------------------------------------------
 ; MODIFIES: A, X, Y, $And_variables_as_appropriate
 
@@ -42,6 +48,10 @@ Global_variables_will_also_follow_this_convention=$9F26
 
 function_names_are_lower_case:
     jsr
+
+__labels__that_only_exist_to_create:
+__debugging__symbols_or_to_segment_the:
+__code__are_decorated:
 
 ;=================================================
 ; And_yes_the_modifies_section_implies
