@@ -177,6 +177,20 @@ VERA_INC=1
 }
 
 ;=================================================
+; VERA_END_IRQ
+;   Reset the Vera IRQ flag so that it generates interrupts.
+;-------------------------------------------------
+; INPUTS:   (none)
+;
+;-------------------------------------------------
+; MODIFIES: A
+; 
+!macro VERA_END_IRQ {
+	lda #$1
+	sta VERA_irq
+}
+
+;=================================================
 ; VIDEO_INIT
 ;   Turn on the video display.
 ;-------------------------------------------------

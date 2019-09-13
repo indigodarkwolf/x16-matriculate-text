@@ -365,7 +365,7 @@ NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
     +VERA_SET_PALETTE 0, 1
 +   cpy #(Matrix_palette_end - Matrix_palette)
     bne -
-
+    +VERA_END_IRQ
     +SYS_END_IRQ
 
 ;=================================================
@@ -382,6 +382,7 @@ NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 ; 
 inc_new_frame:
     inc New_frame
+    +VERA_END_IRQ
     +SYS_END_IRQ
 
 ;=================================================
