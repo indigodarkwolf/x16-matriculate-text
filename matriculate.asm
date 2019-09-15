@@ -318,7 +318,7 @@ NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 
     lda Palette_cycle_index
-    adc #128
+    adc #128    ; "But you did `adc #127` above." Yes, and it created a sneaky off-by-one bug. So this is a sneaky off-by-one fix.
     clc
     tax
     ldy #0
