@@ -30,7 +30,7 @@ VERA_INC=1
 	VRAM_sprinfo  = $F4000
 	VRAM_sprdata  = $F5000
 
-	VROM_petscii = $20000
+	VROM_petscii = $1F000
 }
 
 ;=================================================
