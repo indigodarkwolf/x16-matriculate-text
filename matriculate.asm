@@ -1,4 +1,4 @@
-!symbollist "greenspace.sym"
+!symbollist "matriculate.sym"
 
 ;=================================================
 ;=================================================
@@ -130,38 +130,6 @@ __start__is_palette_fade_done:
     +VERA_WRITE <(VROM_petscii >> 2)        ; Tile data immediately after map indices
     +VERA_WRITE >(VROM_petscii >> 2)        ; Tile data immediately after map indices
     +VERA_WRITE 0, 0, 0, 0                  ; Hscroll and VScroll to 0
-
-!zn __start__clear_video_memory {
-__start__clear_video_memory:
-    +VERA_SET_ADDR DEFAULT_SCREEN_ADDR, 2
-    +VERA_SELECT_ADDR 1
-    +VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
-    +VERA_SELECT_ADDR 0
-
-    ldx #0
-    ldy #0
-
-.yloop:
-    tya
-    pha
-.xloop:
-    txa
-    pha
-
-    lda #0
-    sta VERA_data
-    sta VERA_data2
-
-    pla
-    tax
-    dex
-    bne .xloop
-
-    pla
-    tay
-    dey
-    bne .yloop
-}
 
 !zn __start__fill_text_buffer_with_random_chars {
 __start__fill_text_buffer_with_random_chars:
@@ -329,7 +297,7 @@ NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 ; Palette cycle (redux) for double-density!
 ;
     lda Palette_cycle_index
-    adc #128
+    adc #127
     clc
 
     ; Set the starting address of the VRAM palette we're going to cycle
@@ -351,6 +319,7 @@ NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 
     lda Palette_cycle_index
     adc #128
+    clc
     tax
     ldy #0
 
@@ -423,31 +392,31 @@ VERA_stream_out_data:
     txa
     cmp #0
     tax
-    beq @no_blocks
+    beq .no_blocks
 
     ; Copy X pages to VERA_data
     ldy #0
-@loop:
+.loop:
     lda ($FB),Y
     sta VERA_data
     iny
-    bne @loop
+    bne .loop
 
     inc $FC
     dex
-    bne @loop
+    bne .loop
 
-@no_blocks:
+.no_blocks:
     ; Copy X bytes to VERA_data
     pla
     tax
     ldy #0
-@loop2:
+.loop2:
     lda ($FB),Y
     sta VERA_data
     iny
     dex
-    bne @loop2
+    bne .loop2
     rts
 
 ;=================================================
@@ -510,7 +479,7 @@ Palette_decrement_table:
 ;   Variables
 ;
 ;-------------------------------------------------
-!src "greenspace_vars.asm"
+!src "matriculate_vars.asm"
 !src "system_vars.asm"
 
     +SYS_FOOTER

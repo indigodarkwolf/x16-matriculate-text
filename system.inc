@@ -286,16 +286,16 @@ HEADER_A000_IN_USE=1
         sta $FF
 
         ldy #$00 ; reset y for our loop
-@loop:
+.loop:
         lda .src
         sta ($FD),Y ; indirect index dest memory address
         iny
-        bne @loop   ; loop until our dest goes over 255
+        bne .loop   ; loop until our dest goes over 255
 
         inc $FE     ; increment high order dest memory address
 
         dec $FF     ; decrement number of pages remaining
-        bne @loop   ; If we still have at least 1 page to copy, go back and copy it
+        bne .loop   ; If we still have at least 1 page to copy, go back and copy it
     }
     !if <.size > 0 {
                     ; If we're not copying exactly some number of pages, include
