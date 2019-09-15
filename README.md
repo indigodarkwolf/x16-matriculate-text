@@ -8,11 +8,12 @@ A Matrix-inspired text crawl that totally took me to school.
 "he matriculated at the University of Vermont"
 
 <h3>What this does, in order:</h3>
-* Perform a table-based decrement of each palette index once per frame until all palette colors have been set to black ($0000).
-* Assign a random character to each screen position
-* Assign a random palette index to each character in the top row
-* Set each subsequent row's character palette indices to "whatever it is directly above me, plus 1". There's 256 colors in the X16's palette, and I can use 255 of them (I have to leave color 0 black for the background, so that means if I'm about to assign palette index "0" to a character, I instead assign "1").
-* Perform a palette-cycling trick, which is to say I've got an array of colors in program memory from white-green to black, and I just write them to a chunk of the system palette, and then increment my starting point by 1 each frame. The Vera's hardware does the rest, choosing what colors to draw based on that palette.
+<ul><li>Perform a table-based decrement of each palette index once per frame until all palette colors have been set to black ($0000).</li>
+<li>Assign a random character to each screen position</li>
+<li>Assign a random palette index to each character in the top row</li>
+<li>Set each subsequent row's character palette indices to "whatever it is directly above me, plus 1". There's 256 colors in the X16's palette, and I can use 255 of them (I have to leave color 0 black for the background, so that means if I'm about to assign palette index "0" to a character, I instead assign "1").</li>
+<li>Perform a palette-cycling trick, which is to say I've got an array of colors in program memory from white-green to black, and I just write them to a chunk of the system palette, and then increment my starting point by 1 each frame. The Vera's hardware does the rest, choosing what colors to draw based on that palette.</li>
+</ul>
 
 <h3>Getting started with assembly on the X16</h3>
 For the X16, the basic tools you need are any text editor and a 6502 assembler program.
