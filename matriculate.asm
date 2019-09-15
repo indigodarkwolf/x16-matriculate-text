@@ -1,4 +1,4 @@
-!symbollist "greenspace.sym"
+!symbollist "matriculate.sym"
 
 ;=================================================
 ;=================================================
@@ -479,7 +479,7 @@ Palette_decrement_table:
 ;   Variables
 ;
 ;-------------------------------------------------
-!src "greenspace_vars.asm"
+!src "matriculate_vars.asm"
 !src "system_vars.asm"
 
     +SYS_FOOTER

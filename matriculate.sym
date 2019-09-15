@@ -13,12 +13,12 @@
 	All_palettes_cleared	= $c69	; ?
 	Petscii_table	= $a6b	; ?
 	VERA_addr_bank	= $9f22
+	MATRICULATE_VARIABLES_ASM	= $1	; unused
 	VERA_ctrl	= $9f25
 	__start__fill_palette_of_remaining_chars	= $929	; unused
 	Matrix_palette_rev	= $b2a	; unused
 	VRAM_composer	= $f0000	; unused
 	i	= $21
-	GREENSPACE_VARIABLES_ASM	= $1	; unused
 	VERA_addr_high	= $9f21
 	DEFAULT_SCREEN_SIZE	= $4000	; unused
 	VRAM_sprinfo	= $f4000	; unused
