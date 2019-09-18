@@ -222,6 +222,9 @@ __start__fill_palette_of_remaining_chars:
     bne .yloop
 }
 
+    lda #32
+    sta Fade_in_steps
+
     +SYS_SET_IRQ irq_handler
     cli
 
@@ -271,9 +274,27 @@ irq_handler:
     lda #<(VRAM_palette >> 16) | (1 << 4)
     sta VERA_addr_bank
 
-    lda #<Matrix_palette
+    ; Okay, this is tricksy: I'm generating 16 palettes which range from "full brightness" to "no brightness".
+    ; Then, I'm generating two tables using the start addresses of each palette. One with the high byte of these
+    ; addresses, one with the low byte.
+    ; Fade_in_steps is nominally the number of frames left in the fade-in process. I happen to be choosing
+    ; a value that is 2x as many palettes as I have to choose from, so I'm decrementing the value and then
+    ; right-shifting to get the "palette index" I want. I then use this index to grab the high byte and low byte
+    ; of the address of the appropriate palette, from the pair of tables I generated with their addresses.
+    ; That's the palette I apply.
+    ldx Fade_in_steps
+    cpx #0
+    beq +
+    dex
+    stx Fade_in_steps
+
++   txa
+    lsr
+    tax
+
+    lda Matrix_palette_table_low, X
     sta $FB
-    lda #>Matrix_palette
+    lda Matrix_palette_table_high, X
     sta $FC
 
 NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
@@ -310,9 +331,12 @@ NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
     lda #<(VRAM_palette >> 16) | (1 << 4)
     sta VERA_addr_bank
 
-    lda #<Matrix_palette
+    lda Fade_in_steps
+    lsr
+    tax
+    lda Matrix_palette_table_low, X
     sta $FB
-    lda #>Matrix_palette
+    lda Matrix_palette_table_high, X
     sta $FC
 
 NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
@@ -447,12 +471,76 @@ Matrix_palette:
     !le16 $0090, $0090, $00A0, $00A0, $00B0, $00B0, $00C0, $00C0
     !le16 $00D0, $00D0, $00E0, $00E0, $00F0, $00F0, $08FC
 Matrix_palette_end:
+
+!macro LE16_MIN .v0, .v1 {
+    !if .v0 < .v1 {
+        !le16 .v0
+    } else {
+        !le16 .v1
+    }
+}
+
+!macro LE16_MAX .v0, .v1 {
+    !if .v0 > .v1 {
+        !le16 .v0
+    } else {
+        !le16 .v1
+    }
+}
+
+!macro COLOR_DEC .color, .amt {
+    !le16 0 ; I'll figure this out later, for now I'm cheating and the "leading character" will
+            ; just be black during the fade-in.
+}
+
+!for i, 1, 16 {
+    !le16 $0000, $0000
+    +LE16_MAX $0020 - i*$10, 0
+    +LE16_MAX $0020 - i*$10, 0
+    +LE16_MAX $0030 - i*$10, 0
+    +LE16_MAX $0030 - i*$10, 0
+    +LE16_MAX $0040 - i*$10, 0
+    +LE16_MAX $0040 - i*$10, 0
+    +LE16_MAX $0050 - i*$10, 0
+    +LE16_MAX $0050 - i*$10, 0
+    +LE16_MAX $0060 - i*$10, 0
+    +LE16_MAX $0060 - i*$10, 0
+    +LE16_MAX $0070 - i*$10, 0
+    +LE16_MAX $0070 - i*$10, 0
+    +LE16_MAX $0080 - i*$10, 0
+    +LE16_MAX $0080 - i*$10, 0
+    +LE16_MAX $0090 - i*$10, 0
+    +LE16_MAX $0090 - i*$10, 0
+    +LE16_MAX $00A0 - i*$10, 0
+    +LE16_MAX $00A0 - i*$10, 0
+    +LE16_MAX $00B0 - i*$10, 0
+    +LE16_MAX $00B0 - i*$10, 0
+    +LE16_MAX $00C0 - i*$10, 0
+    +LE16_MAX $00C0 - i*$10, 0
+    +LE16_MAX $00D0 - i*$10, 0
+    +LE16_MAX $00D0 - i*$10, 0
+    +LE16_MAX $00E0 - i*$10, 0
+    +LE16_MAX $00E0 - i*$10, 0
+    +LE16_MAX $00F0 - i*$10, 0
+    +LE16_MAX $00F0 - i*$10, 0
+    +COLOR_DEC $08FC, i
+}
+
 Matrix_palette_rev:
     !le16 $0000, $0000, $08FC, $00F0, $00F0, $00E0, $00E0, $00D0
     !le16 $00D0, $00C0, $00C0, $00B0, $00B0, $00A0, $00A0, $0090
     !le16 $0090, $0080, $0080, $0070, $0070, $0060, $0060, $0050
     !le16 $0050, $0040, $0040, $0030, $0030, $0020, $0020
 Matrix_palette_rev_end:
+
+Matrix_palette_table_high:
+    !for i, 0, 16 {
+    !byte >(Matrix_palette + ((Matrix_palette_end - Matrix_palette) * i))
+    }
+Matrix_palette_table_low:
+    !for i, 0, 16 {
+    !byte <(Matrix_palette + ((Matrix_palette_end - Matrix_palette) * i))
+    }
 
 Palette_decrement_table:
     ;     $X0, $X1, $X2, $X3, $X4, $X5, $X6, $X7, $X8, $X9, $XA, $XB, $XC, $XD, $XE, $XF
