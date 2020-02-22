@@ -22,6 +22,8 @@
 DEFAULT_SCREEN_ADDR = (0)
 DEFAULT_SCREEN_SIZE = ((128*64)*2)
 
+NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
+
 ;=================================================
 ; MOD
 ;   Module the accumulator by a value.
@@ -108,7 +110,6 @@ decrement_palette_entry:
 
     sei
 
-.proc __start__is_palette_fade_done
     lda #0
     sta New_frame
 
@@ -137,7 +138,7 @@ decrement_palette_entry:
     VERA_SET_ADDR VRAM_layer2
     VERA_WRITE ($01 << 5) | $00            ; Mode 1 (256-color text), disabled
 
-.proc __start__fill_text_buffer_with_random_chars
+.proc fill_text_buffer_with_random_chars
     VERA_SET_ADDR DEFAULT_SCREEN_ADDR, 2
 
     ldx #128
@@ -166,12 +167,12 @@ xloop:
     bne yloop
 .endproc
 
-.proc __start__offset_palette_of_each_column
+.proc offset_palette_of_each_column
     VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
 
     lda #128
 
-xloop2:
+xloop:
     pha
 
     jsr sys_rand
@@ -185,10 +186,10 @@ xloop2:
     pla
     sec
     sbc #1
-    bne xloop2
+    bne xloop
 .endproc
 
-.proc __start__fill_palette_of_remaining_chars
+.proc fill_palette_of_remaining_chars
     VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
     VERA_SELECT_ADDR 1
     VERA_SET_ADDR DEFAULT_SCREEN_ADDR+257, 2
@@ -197,9 +198,9 @@ xloop2:
     ldx #127
     ldy #64
 
-yloop3:
+yloop:
     phy
-xloop3:
+xloop:
     phx
 
     lda VERA_data
@@ -207,19 +208,19 @@ xloop3:
     adc #1
     ; If we're about to assign palette index 0 (background), increment to 1
     cmp #0
-    bne store_index2
+    bne store_index
     clc
     adc #1
-store_index2:
+store_index:
     sta VERA_data2
 
     plx
     dex
-    bne xloop3
+    bne xloop
 
     ply
     dey
-    bne yloop3
+    bne yloop
 .endproc
 
     lda #32
@@ -254,14 +255,18 @@ irq_handler:
     lda Palette_cycle_index
     clc
     adc #1
-    ; Skip index zero, that's the background, we want to leave it black.
+    ; I don't want to clobber palette index 0. Fortunately, the highest palette index is
+    ; also the maximum of an unsigned 8-bit integer, as with our registers on the 6502. There
+    ; is a "carry" bit in the processor which indicates overflows, and is intended to aid with
+    ; multi-byte additions. We can sneakily use it to skip zero, however, by attempting to add
+    ; "0" to our incremented value. If the carry bit was set, we'll actually add "1", which
+    ; causes us to skip 0.
     adc #0
     sta Palette_cycle_index
 
-;
-; Palette cycle for the letters glowing and stuff
-;
-
+    ;
+    ; Palette cycle for the letters glowing and stuff
+    ;
     ; Set the starting address of the VRAM palette we're going to cycle
     asl ; Palette_cycle_index * 2 == Address offset into palette memory
     ; adc #<(VRAM_palette) ; We happen to know that #<(VRAM_palette) is 0. Being able to skip this also preserves Carry in case it was set
@@ -272,14 +277,15 @@ irq_handler:
     lda #<(VRAM_palette >> 16) | (1 << 4)
     sta VERA_addr_bank
 
-    ; Okay, this is tricksy: I'm generating 16 palettes which range from "full brightness" to "no brightness".
+    ; Okay, this is tricksy: 
+    ; First, I'm generating 16 palettes which range from "full brightness" to "no brightness".
     ; Then, I'm generating two tables using the start addresses of each palette. One with the high byte of these
     ; addresses, one with the low byte.
     ; Fade_in_steps is nominally the number of frames left in the fade-in process. I happen to be choosing
     ; a value that is 2x as many palettes as I have to choose from, so I'm decrementing the value and then
     ; right-shifting to get the "palette index" I want. I then use this index to grab the high byte and low byte
     ; of the address of the appropriate palette, from the pair of tables I generated with their addresses.
-    ; That's the palette I apply.
+    ; That high byte and low byte make the final address of the palette I apply.
     ldx Fade_in_steps
     cpx #0
     beq :+
@@ -295,8 +301,6 @@ irq_handler:
     lda Matrix_palette_table_high, X
     sta $FC
 
-NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
-
     ldx Palette_cycle_index
     ldy #0
 
@@ -308,22 +312,24 @@ stream_out_color:
     sta VERA_data
     iny
     inx
-    bne check_for_end
+    bne check_for_end   
+    ; If incrementing X here put us at zero (e.g. we'll clobber palette index 0 next), reset the VERA data address to point at palette index 1 instead. 
+    ; We know we can't cycle through index 0 twice, so no additional fix-up is needed.
     VERA_SET_PALETTE 0, 1
 check_for_end:
     cpy #(Matrix_palette_end - Matrix_palette)
     bne stream_out_color
-
-;
-; Palette cycle (redux) for double-density!
-;
+ 
+    ;
+    ; Palette cycle (redux) for double-density! See if you can still follow what's going on, with fewer comments.
+    ;
     lda Palette_cycle_index
-    adc #127
     clc
+    adc #127
+    adc #0
 
     ; Set the starting address of the VRAM palette we're going to cycle
     asl ; Palette_cycle_index * 2 == Address offset into palette memory
-    ; adc #<(VRAM_palette) ; We happen to know that #<(VRAM_palette) is 0. Being able to skip this also preserves Carry in case it was set
     sta VERA_addr_low
     lda #<(VRAM_palette >> 8)
     adc #0  ; Add carry bit for indices 128-255
@@ -339,11 +345,9 @@ check_for_end:
     lda Matrix_palette_table_high, X
     sta $FC
 
-; NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
-
     lda Palette_cycle_index
-    adc #128    ; "But you did `adc #127` above." Yes, and it created a sneaky off-by-one bug. So this is a sneaky off-by-one fix.
-    clc
+    adc #127
+    adc #0
     tax
     ldy #0
 
