@@ -32,7 +32,7 @@ https://code.visualstudio.com/
 
 For the assembler, I used cc65:
 
-(TODO: Replace this link)
+https://cc65.github.io/
 
 If you're completely new to assembly and the 6502, I feel like this resource is a good starting point:
 
