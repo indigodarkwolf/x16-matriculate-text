@@ -1,5 +1,5 @@
-!ifdef VERA_INC !eof
-VERA_INC=1
+.ifndef VERA_INC
+.define VERA_INC 1
 
 ;=================================================
 ;=================================================
@@ -8,30 +8,25 @@ VERA_INC=1
 ;
 ;-------------------------------------------------
 
-!addr {
-	!if MACHINE_C64 = 1 {
-		VERA_base = $df00
-	} else {
-		VERA_base = $9f20
-	}
-	VERA_addr_low   = VERA_base+0
-	VERA_addr_high  = VERA_base+1
-	VERA_addr_bank  = VERA_base+2
-	VERA_data       = VERA_base+3
-	VERA_data2      = VERA_base+4
-	VERA_ctrl       = VERA_base+5
-	VERA_irq_ctrl   = VERA_base+6
-	VERA_irq        = VERA_base+7
+VERA_base = $9f20
 
-	VRAM_composer = $F0000
-	VRAM_palette  = $F1000
-	VRAM_layer1   = $F2000
-	VRAM_layer2   = $F3000
-	VRAM_sprinfo  = $F4000
-	VRAM_sprdata  = $F5000
+VERA_addr_low   = VERA_base+0
+VERA_addr_high  = VERA_base+1
+VERA_addr_bank  = VERA_base+2
+VERA_data       = VERA_base+3
+VERA_data2      = VERA_base+4
+VERA_ctrl       = VERA_base+5
+VERA_irq_ctrl   = VERA_base+6
+VERA_irq        = VERA_base+7
 
-	VROM_petscii = $1F000
-}
+VRAM_composer = $F0000
+VRAM_palette  = $F1000
+VRAM_layer1   = $F2000
+VRAM_layer2   = $F3000
+VRAM_sprinfo  = $F4000
+VRAM_sprdata  = $F5000
+
+VROM_petscii = $0F800
 
 ;=================================================
 ;=================================================
@@ -50,10 +45,10 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VERA_SELECT_ADDR .addr {
-	lda #.addr
+.macro VERA_SELECT_ADDR addr
+	lda #addr
 	sta VERA_ctrl
-}
+.endmacro
 
 ;=================================================
 ; VERA_SET_ADDR (multiple)
@@ -82,18 +77,18 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VERA_SET_ADDR .addr, .stride {
-	lda #<(.addr)
+.macro VERA_SET_ADDR addr, stride
+	lda #<(addr)
 	sta VERA_addr_low
-	lda #<(.addr >> 8)
+	lda #<(addr >> 8)
 	sta VERA_addr_high
-	lda #<(.addr >> 16) | (.stride << 4)
+	.ifblank stride
+		lda #<(addr >> 16) | (1 << 4)
+	.else
+		lda #<(addr >> 16) | (stride << 4)
+	.endif
 	sta VERA_addr_bank
-}
-
-!macro VERA_SET_ADDR .addr {
-	+VERA_SET_ADDR .addr, 1
-}
+.endmacro
 
 ;=================================================
 ; VERA_WRITE (multiple)
@@ -106,30 +101,16 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VERA_WRITE .v0 {
-	lda #.v0
+.macro VERA_WRITE v0, v1, v2, v3, v4, v5, v6, v7, v8
+	.ifblank v0
+		.exitmacro
+	.endif
+	lda #v0
 	sta VERA_data
-}
-
-!macro VERA_WRITE .v0, .v1 {
-	+VERA_WRITE .v0
-	+VERA_WRITE .v1
-}
-
-!macro VERA_WRITE .v0, .v1, .v2 {
-	+VERA_WRITE .v0, .v1
-	+VERA_WRITE .v2
-}
-
-!macro VERA_WRITE .v0, .v1, .v2, .v3 {
-	+VERA_WRITE .v0, .v1
-	+VERA_WRITE .v2, .v3
-}
-
-!macro VERA_WRITE .v0, .v1, .v2, .v3, .v4, .v5, .v6, .v7 {
-	+VERA_WRITE .v0, .v1, .v2, .v3
-	+VERA_WRITE .v4, .v5, .v6, .v7
-}
+	.if .paramcount > 1
+		VERA_WRITE v1, v2, v3, v4, v5, v6, v7, v8
+	.endif
+.endmacro
 
 ;=================================================
 ; VPEEK
@@ -140,10 +121,10 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VPEEK .addr {
-	+VERA_SET_ADDR .addr
+.macro VPEEK addr
+	VERA_SET_ADDR addr
 	lda VERA_data
-}
+.endmacro
 
 ;=================================================
 ; VERA_SET_SPRITE
@@ -155,9 +136,9 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VERA_SET_SPRITE .sprite_index {
-	+VERA_SET_ADDR (VRAM_sprdata + (.sprite_index << 3))
-}
+.macro VERA_SET_SPRITE sprite_index
+	VERA_SET_ADDR (VRAM_sprdata + (sprite_index << 3))
+.endmacro
 
 ;=================================================
 ; VERA_SET_PALETTE
@@ -170,13 +151,13 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VERA_SET_PALETTE .palette_index {
-	+VERA_SET_ADDR (VRAM_palette + (.palette_index << 5))
-}
-
-!macro VERA_SET_PALETTE .palette_index, .color_offset {
-	+VERA_SET_ADDR (VRAM_palette + (.palette_index << 5) + (.color_offset << 1))
-}
+.macro VERA_SET_PALETTE palette_index, color_offset
+	.ifblank color_offset
+		VERA_SET_ADDR (VRAM_palette + (palette_index << 5))
+	.else
+		VERA_SET_ADDR (VRAM_palette + (palette_index << 5) + (color_offset << 1))
+	.endif
+.endmacro
 
 ;=================================================
 ; VERA_RESET
@@ -188,10 +169,10 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VERA_RESET {
+.macro VERA_RESET
 	lda #$80
 	sta VERA_ctrl
-}
+.endmacro
 
 ;=================================================
 ; VERA_END_IRQ
@@ -202,10 +183,10 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VERA_END_IRQ {
+.macro VERA_END_IRQ
 	lda #$1
 	sta VERA_irq
-}
+.endmacro
 
 ;=================================================
 ; VIDEO_INIT
@@ -216,7 +197,7 @@ VERA_INC=1
 ;-------------------------------------------------
 ; MODIFIES: A
 ; 
-!macro VIDEO_INIT {
+.macro VIDEO_INIT
 	lda #0
 	sta VERA_ctrl ; set ADDR1 active
 	sta VERA_addr_high
@@ -226,4 +207,6 @@ VERA_INC=1
 	sta VERA_addr_low
 	lda #1
 	sta VERA_data ; VGA output
-}
+.endmacro
+
+.endif

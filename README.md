@@ -30,9 +30,9 @@ For a text editor, I used Visual Studio Code:
 
 https://code.visualstudio.com/
 
-For the assembler, I used Acme 0.96.4:
+For the assembler, I used cc65:
 
-https://sourceforge.net/projects/acme-crossass/files/win32/
+(TODO: Replace this link)
 
 If you're completely new to assembly and the 6502, I feel like this resource is a good starting point:
 

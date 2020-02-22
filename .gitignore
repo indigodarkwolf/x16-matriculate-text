@@ -1,2 +1,5 @@
 bin
 .vs
+.vscode
+*.o
+output.txt
