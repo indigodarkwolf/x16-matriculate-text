@@ -116,7 +116,6 @@ decrement_palette_entry:
     lda All_palettes_cleared
     cmp #0
     beq decrement_palette
-.endproc
 
     ;
     ; Palette memory should now be all 0s, or a black screen.
@@ -238,6 +237,9 @@ store_index:
 ;
 ;-------------------------------------------------
 
+Line_number: .byte 0, 0
+Offset: .byte 0, 0, 0
+
 ;=================================================
 ; irq_handler
 ;   This is essentially my "do_frame". Several others have been doing this as well.
@@ -251,6 +253,60 @@ store_index:
 ; MODIFIES: A, X, Y, VRAM_palette
 ; 
 irq_handler:
+    lda VERA_irq
+    and #$02
+    beq vsync_irq
+
+    lda #1
+    adc Line_number
+    sta Line_number
+    lda #0
+    adc Line_number+1
+    sta Line_number+1
+
+    lda #128
+    adc Offset
+    sta Offset
+    lda #0
+    adc Offset+1
+    sta Offset+1
+    lda #0
+    adc Offset+2
+    sta Offset+2
+
+    VERA_SET_ADDR $0F2006, 1
+    lda Offset+1
+    sta VERA_data
+    lda Offset+2
+    sta VERA_data
+
+    VERA_SET_ADDR $0F0009, 1
+    lda Line_number
+    sta VERA_data
+    lda Line_number+1
+    sta VERA_data
+
+    lda #$2
+    sta VERA_irq
+    SYS_END_IRQ
+
+vsync_irq:
+    stz Line_number
+    stz Line_number+1
+    stz Offset
+    stz Offset+1
+    stz Offset+2
+    VERA_SET_ADDR $0F2006, 1
+    stz VERA_data
+    stz VERA_data
+
+    VERA_SET_ADDR $0F0009, 1
+    stz VERA_data
+    stz VERA_data
+
+    lda #$03
+    sta VERA_irq_ctrl
+
     ; Increment which palette index we're starting at
     lda Palette_cycle_index
     clc
