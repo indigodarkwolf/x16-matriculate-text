@@ -239,6 +239,7 @@ store_index:
 
 Line_number: .byte 0, 0
 Offset: .byte 0, 0, 0
+Offset_init: .byte 0, 0, 0
 
 ;=================================================
 ; irq_handler
@@ -293,12 +294,25 @@ irq_handler:
 vsync_irq:
     stz Line_number
     stz Line_number+1
-    stz Offset
-    stz Offset+1
-    stz Offset+2
+
+    lda #128
+    adc Offset_init
+    sta Offset_init
+    sta Offset
+    lda #0
+    adc Offset_init+1
+    sta Offset_init+1
+    sta Offset+1
+    lda #0
+    adc Offset_init+2
+    sta Offset_init+2
+    sta Offset+2
+
     VERA_SET_ADDR $0F2006, 1
-    stz VERA_data
-    stz VERA_data
+    lda Offset+1
+    sta VERA_data
+    lda Offset+2
+    sta VERA_data
 
     VERA_SET_ADDR $0F0009, 1
     stz VERA_data

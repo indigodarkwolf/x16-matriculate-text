@@ -5,4 +5,4 @@ REM set EMU_DIR=..\..\x16emu_win-r36
 REM set EMU=.\x16emu.exe
 
 cd %EMU_DIR%
-%EMU% -prg "matriculate.prg" -debug -scale 2
+%EMU% -prg "matriculate.prg" -debug -scale 2 -quality nearest
