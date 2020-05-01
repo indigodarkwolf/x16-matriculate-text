@@ -1,17 +1,22 @@
 @echo off
 
+set PROJECT=matriculate
 set EMU_DIR=..\..\vs2019\x16-bin
-set EMU=.\x16emu_Release.exe
-REM set EMU_DIR=..\..\x16emu_win-r36
-REM set EMU=.\x16emu.exe
 
-set ASM=..\bin\cc65\bin\cl65.exe
-set ASM_OPTS=--cpu 65c02
+set OBJ_DIR=obj
 
-::set LINK=bin\cc65\bin\cl65.exe
-::set LINK_OPTS=
+set ASM=..\bin\cc65\bin\ca65.exe
+set LNK=..\bin\cc65\bin\cl65.exe
 
-%ASM% %ASM_OPTS% -o matriculate.prg matriculate.asm
-::%LINK% %LINK_OPTS -o matriculate.prg matriculate.obj
+:: Raw binaries
 
-copy matriculate.prg %EMU_DIR%
+%ASM% -o tables/graphics_tables.o tables/graphics_tables.asm
+%LNK% -o graphics_tables.seq tables/graphics_tables.o --target none
+
+:: Executable
+
+%ASM% -o %PROJECT%.o %PROJECT%.asm --cpu 65C02
+%LNK% -o %PROJECT%.prg -DC64 %PROJECT%.o
+
+copy graphics_tables.seq %EMU_DIR%
+copy %PROJECT%.prg %EMU_DIR%
