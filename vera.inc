@@ -714,6 +714,13 @@ DATA_ADDR=data_addr>>5
 	txa
 	ror
 	sta VERA_ien
+
+	; Oh, but he wasn't done with optimizing the general problem, however this method doesn't work with VERA_ien because it's not vanilla memory:
+
+	; asl VERA_ien 	; move bit 6-0 left - destroying bit 7
+	; lda source+1
+	; lsr 			; put bit 0 into C
+	; ror VERA_ien 	; put C into bit 7, moving bit 6-0 back where they started
 .endmacro
 
 ;=================================================
