@@ -11,8 +11,11 @@
 ;
 ;-------------------------------------------------
 
-.include "vera.inc"
+.include "debug.inc"
+.include "graphics.inc"
+.include "kernal.inc"
 .include "system.inc"
+.include "vera.inc"
 
 ;=================================================
 ; Macros
@@ -21,6 +24,7 @@
 
 DEFAULT_SCREEN_ADDR = (0)
 DEFAULT_SCREEN_SIZE = ((128*64)*2)
+VROM_PETSCII = ($1F<<11)
 
 NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 
@@ -47,108 +51,47 @@ NUM_MATRIX_PALETTE_ENTRIES = ((Matrix_palette_end - Matrix_palette) >> 1)
 ;
 ;-------------------------------------------------
 start:
-    SYS_RAND_SEED $34, $56, $fe
-
-decrement_palette:
-    ; This is an optimistic flag: have we cleared the entire palette? 
-    ; We'll falsify if not.
-    lda #1
-    sta All_palettes_cleared
-
-    ; Let's assume the system is starting in Mode 0 with the default palette.
-    ; And fade out the screen because we can.
-    VERA_SELECT_ADDR 0
-    VERA_SET_PALETTE 0
-    VERA_SELECT_ADDR 1
-    VERA_SET_PALETTE 0
-
-    ldy #0 ; 256 colors in the palette
-
-decrement_palette_entry:
-    lda VERA_data
-    ; Don't need to decrement if already #0 (black)
-    cmp #0
-    beq :+
-
-    ; The first byte is %0000rrrr, which means we could get away just a
-    ; decrement. But the second is %ggggbbbb, so we need to decrement 
-    ; each half if not 0. Instead of complex assembly to do that, I'm just 
-    ; going to precompute to a table and do a lookup of the next value.
-    ; And since I did it that way for the second byte, do it the same
-    ; way for the first as well since that answer is good for both.
-    tax
-
-    lda #0
-    sta All_palettes_cleared
-
-    lda Palette_decrement_table, X
-:   sta VERA_data2
-
-    lda VERA_data
-
-    ; Still don't need to decrement 0.
-    cmp #0
-    beq :+
-
-    tax
-
-    lda #0
-    sta All_palettes_cleared
-
-    lda Palette_decrement_table, X
-:   sta VERA_data2
-
-    dey
-    bne decrement_palette_entry
-
-    SYS_SET_IRQ inc_new_frame
-    cli
-    ; Tight loop until next frame
-:   lda New_frame
-    cmp #$01
-    bne :-
-
     sei
 
-    lda #0
-    sta New_frame
+    SYS_INIT_IRQ
+    SYS_RAND_SEED $34, $56, $fe
 
-    lda All_palettes_cleared
-    cmp #0
-    beq decrement_palette
+    jsr graphics_init
+    jsr graphics_fade_out
+
+    jsr init_stuff
+    jsr fill_text_buffer_with_random_chars
+    jsr offset_palette_of_each_column
+    jsr fill_palette_of_remaining_chars
+
+    lda #32
+    sta Fade_in_steps
+
+    SYS_SET_IRQ irq_handler
+    cli
+
+    jmp *
+
+.proc init_stuff
+    VERA_SET_CTRL 0
+    VERA_CONFIGURE_TILE_LAYER 0, 0, 1, 0, 0, 2, 1, (::DEFAULT_SCREEN_ADDR), (::VROM_PETSCII)
+
+    VERA_DISABLE_LAYER 1
+    VERA_ENABLE_LAYER 0
+
+    rts
 .endproc
 
-    ;
-    ; Palette memory should now be all 0s, or a black screen.
-    ; If only the composer gave us a brightness setting, I could
-    ; have used that. Mei banfa.
-    ;
-
-    VERA_SELECT_ADDR 0
-
-    VERA_SET_ADDR VRAM_layer1
-    VERA_WRITE ($01 << 5) | $01            ; Mode 1 (256-color text), enabled
-    VERA_WRITE %00000110                   ; 8x8 tiles, 128x64 map
-    VERA_WRITE <(DEFAULT_SCREEN_ADDR >> 2) ; Map indices at VRAM address 0
-    VERA_WRITE >(DEFAULT_SCREEN_ADDR >> 2) ; 
-    VERA_WRITE <(VROM_petscii >> 2)        ; Tile data immediately after map indices
-    VERA_WRITE >(VROM_petscii >> 2)        ; Tile data immediately after map indices
-    VERA_WRITE 0, 0, 0, 0                  ; Hscroll and VScroll to 0
-
-    VERA_SET_ADDR VRAM_layer2
-    VERA_WRITE ($01 << 5) | $00            ; Mode 1 (256-color text), disabled
-
 .proc fill_text_buffer_with_random_chars
-    VERA_SET_ADDR DEFAULT_SCREEN_ADDR, 2
+    VERA_SET_ADDR (DEFAULT_SCREEN_ADDR), 2
 
     ldx #128
     ldy #64
 
 yloop:
-    tya
-    pha
+    phy
 xloop:
-    txa
+    phx
 
     jsr sys_rand
     and #$7F
@@ -157,43 +100,45 @@ xloop:
     lda Petscii_table,Y
     sta VERA_data
 
-    tax
+    plx
     dex
     bne xloop
 
-    pla
-    tay
+    ply
     dey
     bne yloop
+
+    rts
 .endproc
 
 .proc offset_palette_of_each_column
-    VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
+    VERA_SET_CTRL 0
+    VERA_SET_ADDR (DEFAULT_SCREEN_ADDR+1), 2
 
-    lda #128
+    ldy #128
 
-xloop:
-    pha
-
+loop:
     jsr sys_rand
     ; If we're about to assign palette index 0 (background), increment to 1
+    ; I don't think we can depend on the carry bit in this case, so we're
+    ; doing this the hard and slow way.
     cmp #0
-    beq :+
+    bne :+
     clc
     adc #1
 :   sta VERA_data
 
-    pla
-    sec
-    sbc #1
-    bne xloop
+    dey
+    bne loop
+
+    rts
 .endproc
 
 .proc fill_palette_of_remaining_chars
-    VERA_SET_ADDR DEFAULT_SCREEN_ADDR+1, 2
-    VERA_SELECT_ADDR 1
-    VERA_SET_ADDR DEFAULT_SCREEN_ADDR+257, 2
-    VERA_SELECT_ADDR 0
+    VERA_SET_CTRL 0
+    VERA_SET_ADDR (DEFAULT_SCREEN_ADDR+1), 2
+    VERA_SET_CTRL 1
+    VERA_SET_ADDR (DEFAULT_SCREEN_ADDR+257), 2
 
     ldx #127
     ldy #64
@@ -207,11 +152,10 @@ xloop:
     clc
     adc #1
     ; If we're about to assign palette index 0 (background), increment to 1
-    cmp #0
-    bne store_index
-    clc
-    adc #1
-store_index:
+    ; Fortunately, the carry bit will be set, so let's just adc #0. Faster
+    ; than branching, anyways.
+    adc #0
+
     sta VERA_data2
 
     plx
@@ -221,15 +165,9 @@ store_index:
     ply
     dey
     bne yloop
+
+    rts
 .endproc
-
-    lda #32
-    sta Fade_in_steps
-
-    SYS_SET_IRQ irq_handler
-    cli
-
-    jmp *
 
 ;=================================================
 ;=================================================
@@ -238,6 +176,7 @@ store_index:
 ;
 ;-------------------------------------------------
 
+.code
 ;=================================================
 ; irq_handler
 ;   This is essentially my "do_frame". Several others have been doing this as well.
@@ -250,7 +189,9 @@ store_index:
 ;-------------------------------------------------
 ; MODIFIES: A, X, Y, VRAM_palette
 ; 
-irq_handler:
+irq_handler: DEBUG_LABEL irq_handler
+    VERA_SET_CTRL 0
+
     ; Increment which palette index we're starting at
     lda Palette_cycle_index
     clc
@@ -274,7 +215,7 @@ irq_handler:
     lda #<(VRAM_palette >> 8)
     adc #0  ; Add carry bit for indices 128-255
     sta VERA_addr_high
-    lda #<(VRAM_palette >> 16) | (1 << 4)
+    lda #<(VRAM_palette >> 16) | ($10)
     sta VERA_addr_bank
 
     ; Okay, this is tricksy: 
@@ -365,24 +306,7 @@ check_for_end2:
     cpy #(Matrix_palette_end - Matrix_palette)
     bne stream_out_color2
 
-    VERA_END_IRQ
-    SYS_END_IRQ
-
-;=================================================
-; inc_new_frame
-;   This is essentially my "do_frame". Several others have been doing this as well.
-;   Since the IRQ is triggered at the beginning of the VGA/NTSA front porch, we don't
-;   get the benefit of the entire VBLANK, but it's still useful as a "do this code
-;   once per frame" function.
-;-------------------------------------------------
-; INPUTS:   Sys_rand_mem
-;
-;-------------------------------------------------
-; MODIFIES: A, X, Sys_rand_mem
-; 
-inc_new_frame:
-    inc New_frame
-    VERA_END_IRQ
+    VERA_END_VBLANK_IRQ
     SYS_END_IRQ
 
 ;=================================================
@@ -392,6 +316,7 @@ inc_new_frame:
 ;
 ;-------------------------------------------------
 .include "system.asm"
+.include "graphics.asm"
 
 ;=================================================
 ;=================================================
@@ -399,6 +324,11 @@ inc_new_frame:
 ;   Data
 ;
 ;-------------------------------------------------
+.data
+Fade_in_steps:
+All_palettes_cleared: .byte $00
+Palette_cycle_index: .byte $00
+
 Petscii_table:
     .repeat $60, i
         .byte i
@@ -496,12 +426,3 @@ Palette_decrement_table:
     .byte $C0, $C0, $C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $C9, $CA, $CB, $CC, $CD, $CE    ; $DX
     .byte $D0, $D0, $D1, $D2, $D3, $D4, $D5, $D6, $D7, $D8, $D9, $DA, $DB, $DC, $DD, $DE    ; $EX
     .byte $E0, $E0, $E1, $E2, $E3, $E4, $E5, $E6, $E7, $E8, $E9, $EA, $EB, $EC, $ED, $EE    ; $FX
-
-;=================================================
-;=================================================
-;
-;   Variables
-;
-;-------------------------------------------------
-.include "matriculate_vars.asm"
-.include "system_vars.asm"
