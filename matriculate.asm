@@ -179,7 +179,7 @@ xloop:
 Frame_number:       .byte $00, $00
 Line_number:        .byte $00, $00
 Line_scroll:        .byte $00, $00, $00
-Line_scroll_rate:   .byte $80, $01
+Line_scroll_rate:   .byte $33, $00
 
 .code
 ;=================================================
@@ -203,7 +203,7 @@ line_irq: DEBUG_LABEL line_irq
     VERA_SET_LAYER_SCROLL_X 0, Line_scroll+1
 
     lda Line_number
-    adc #8
+    adc #1
     sta Line_number
 
     lda Line_number+1
@@ -359,7 +359,7 @@ check_for_end2:
     sta Line_scroll+2
 
     DEBUG_LABEL clear_line_number
-    lda #8
+    lda #1
     sta Line_number
     stz Line_number+1
     stz Line_scroll
@@ -371,7 +371,7 @@ check_for_end2:
     VERA_ENABLE_LINE_IRQ
 
     VERA_END_VBLANK_IRQ
-    SYS_END_IRQ
+    SYS_ABORT_IRQ
 
 ;=================================================
 ;=================================================
